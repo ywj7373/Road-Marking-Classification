@@ -3,7 +3,7 @@ import numpy as np
 from PIL import Image
 from ipm import reverse_rectification, rectification
 from mser import mser
-from svm import hog, train_svm, run_svm
+from svm import hog, train_svm, run_svm, train_rf, run_rf, train_mlp, run_mlp
 import cv2
 import argparse
 import time
@@ -41,8 +41,6 @@ def train_test_split(images, labels, test_size=0.05, shuffle=True, random_state=
 
 
 def get_candidates(img):
-    # TODO: Need to remove glare
-
     # Inverse Perspective Transform: Rectification
     rectified_img = rectification(img)
 
@@ -52,7 +50,7 @@ def get_candidates(img):
     return rectified_img, boxes
 
 
-def train_images(labels, images):
+def train_images(labels, images, classifier):
     # images = images[:20] # Comment this for full training
     # labels = labels[:20] # Comment this for full training
 
@@ -63,8 +61,6 @@ def train_images(labels, images):
         img = cv2.imread(image, 3)
         rectified_img, boxes = get_candidates(img)
 
-        best_box = None
-        # TODO: Find representative box
         for box in boxes:
             (x, y, w, h) = box
 
@@ -91,11 +87,27 @@ def train_images(labels, images):
             continue
         _labels.append(label)
         _H.append(h_element)
-    train_svm(_labels, _H)
+
+    if classifier == "svm-linear":
+        print("Training SVM linear")
+        train_svm(_labels, _H, "linear")
+    elif classifier == "svm-rbf":
+        print("Training SVM RBF")
+        train_svm(_labels, _H, "rbf")
+    elif classifier == "rf":
+        print("Training Random Forest")
+        train_rf(_labels, _H)
+    elif classifier == "mlp":
+        print("Training MLP")
+        train_mlp(_labels, _H)
+    else:
+        ValueError("Wrong classifier")
+        exit(1)
 
 
-def test_images(labels, images):
+def test_images(labels, images, classifier):
     global label_dict
+    sum = 0
 
     for idx, image in enumerate(images):
         img = cv2.imread(image)
@@ -104,22 +116,40 @@ def test_images(labels, images):
 
         # Draw boxes and labels around ROI
         img_clone = rectified_img.copy()
+        answers = []
         for box in boxes:
             (x, y, w, h) = box
             cv2.rectangle(img_clone, (x, y), (x + w, y + h), (0, 255, 0), 1)
 
             # Run classifier
             h = hog(rectified_img, box)
-            output = int(run_svm(h)[1][0][0])
+            output = 0
+            if classifier == "svm-linear" or classifier == "svm-rbf":
+                output = int(run_svm(h)[1][0][0])
+            elif classifier == "rf":
+                output = int(run_rf(h)[1][0][0])
+            elif classifier == "mlp":
+                output = int(run_mlp(h)[1][0][0])
+            else:
+                ValueError("Wrong classifier")
+                exit(1)
             output_str = label_dict[output]
-            cv2.putText(img_clone, output_str, (x, y-3), 3, 1, (0, 255, 0), 2, cv2.LINE_AA)
+            answers.append(output)
+            cv2.putText(img_clone, output_str, (x, y - 3), 3, 1, (0, 255, 0), 2, cv2.LINE_AA)
 
-        # TODO: Evaluation
+        Image.fromarray(img_clone).show()
+        # print(answers)
+        # print(labels[idx])
+
+        if labels[idx] in answers:
+            sum += 1
 
         # Reverse Rectification with labels
-        Image.fromarray(img_clone).show()
-        img_clone = reverse_rectification(img_clone)
+        # img_clone = reverse_rectification(img_clone)
         # Image.fromarray(img_clone).show()
+
+    # Evaluation
+    print("Test Accuracy: {:6}".format(sum / len(labels)))
 
 
 def main(args):
@@ -136,7 +166,7 @@ def main(args):
         for idx, text in enumerate(f.readlines()):
             data_label = text.split(',')[8]  # ex) 'left_turn', '40', ...
             file_name = "RoadMarkingDataset2/{}".format(text.split(',')[9]).replace('.png', '.jpg').rstrip()
-            
+
             if imgIdx >= len(images):
                 break
 
@@ -161,10 +191,10 @@ def main(args):
     # Start training or testing images
     if args.options == "train":
         print("Training Images")
-        train_images(train_labels, train_img)
+        train_images(train_labels, train_img, args.classifier)
     elif args.options == "test":
         print("Testing Images")
-        test_images(test_labels, test_img)
+        test_images(test_labels, test_img, args.classifier)
     else:
         raise ValueError("Invalid Options")
 
@@ -172,5 +202,10 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Road Marking Classification")
     parser.add_argument('--options', type=str, default="train", choices=["train", "test"], help="Train or test")
+    parser.add_argument('--classifier', type=str,
+                        default="svm-linear",
+                        choices=["svm-linear", "svm-rbf", "rf", "mlp"],
+                        help="SVM, Random Forest, MLP")
+
     args = parser.parse_args()
     main(args)
