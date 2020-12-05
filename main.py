@@ -58,6 +58,7 @@ def train_images(labels, images):
 
     # Create trainable hog features
     H = np.zeros((len(images), 3780))
+    skipped = []
     for idx, image in enumerate(images):
         img = cv2.imread(image, 3)
         rectified_img, boxes = get_candidates(img)
@@ -66,11 +67,16 @@ def train_images(labels, images):
         # TODO: Find representative box
         for box in boxes:
             (x, y, w, h) = box
-            best_box = box # TODO: Fix this
-            cv2.rectangle(rectified_img, (x, y), (x + w, y + h), (0, 255, 0), 1)
-        Image.fromarray(rectified_img).show()
-        print(rectified_img.shape)
-        time.sleep(0.5)
+
+        if len(boxes) <= 0:
+            skipped.append(idx)
+            continue
+
+        best_box = boxes[-1]
+        cv2.rectangle(rectified_img, (x, y), (x + w, y + h), (0, 255, 0), 1)
+        # Image.fromarray(rectified_img).show()
+        # print(rectified_img.shape)
+        # time.sleep(0.2)
 
         # Histogram of Gradients
         if best_box is not None:
@@ -78,7 +84,14 @@ def train_images(labels, images):
             H[idx] = np.array(h).flatten()
 
     # Train SVM
-    train_svm(labels, H)
+    _labels = []
+    _H = []
+    for idx, (label, h_element) in enumerate(zip(labels, H)):
+        if idx in skipped:
+            continue
+        _labels.append(label)
+        _H.append(h_element)
+    train_svm(_labels, _H)
 
 
 def test_images(labels, images):

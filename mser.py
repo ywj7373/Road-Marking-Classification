@@ -95,7 +95,6 @@ def merge_similar_box(boxes):
 
 
     index = 0
-    print(f'before iou merge: {len(boxes)}')
     while index < len(boxes):
         if len(boxes) <= 1:
             break
@@ -103,7 +102,7 @@ def merge_similar_box(boxes):
         b1 = boxes[index]
         to_merge = None
         for b2 in boxes[index+1:]:
-            print(b1, b2)
+            # print(b1, b2)
             if is_close(b1, b2):
                 to_merge = b2
                 break
@@ -120,22 +119,25 @@ def merge_similar_box(boxes):
         boxes.remove(b1)
         boxes.remove(to_merge)
         boxes = boxes[:index] + [combined_box] + boxes[index+1:]
-    print(f'after iou merge: {len(boxes)}')
 
     _boxes = []
     for box in boxes:
         (x, y, w, h) = box
 
         if (w*h) > 50000:
-            print(f'too large: {w*h}')
             continue
 
         if x < 200 or x+w > 600:
             continue
 
-        if h/w > 3:
+        if h/w > 2:
+            continue
+
+        if w/h > 4:
             continue
         _boxes.append(box)
+
+    sorted(_boxes, key = lambda x: x[1] + x[3])
 
     return _boxes
 
