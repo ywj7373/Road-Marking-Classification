@@ -116,9 +116,9 @@ def merge_similar_box(boxes):
             continue
 
         combined_box = merge_box([b1, to_merge])
+        boxes = boxes[:index] + [combined_box] + boxes[index:]
         boxes.remove(b1)
         boxes.remove(to_merge)
-        boxes = boxes[:index] + [combined_box] + boxes[index+1:]
 
     _boxes = []
     for box in boxes:
