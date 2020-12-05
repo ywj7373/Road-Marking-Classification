@@ -6,6 +6,7 @@ from mser import mser
 from svm import hog, train_svm, run_svm
 import cv2
 import argparse
+import time
 
 label_dict = {}
 
@@ -67,7 +68,9 @@ def train_images(labels, images):
             (x, y, w, h) = box
             best_box = box # TODO: Fix this
             cv2.rectangle(rectified_img, (x, y), (x + w, y + h), (0, 255, 0), 1)
-            # Image.fromarray(rectified_img).show()
+        Image.fromarray(rectified_img).show()
+        print(rectified_img.shape)
+        time.sleep(0.5)
 
         # Histogram of Gradients
         if best_box is not None:
