@@ -124,24 +124,36 @@ def test_images(labels, images):
 
 def main(args):
     # Load multiple images
-    image_path = "RoadMarkingDataset/*.jpg"
+    image_path = "RoadMarkingDataset2/*.jpg"
     images = sorted(glob.glob(image_path))
-
     # Load labels (shape = (1443, 1))
-    labels = np.zeros((1443, 1)).astype(np.int32)
+    labels = np.zeros((len(images), 1)).astype(np.int32)
     global label_dict
+    imgIdx = 0
+
+    # return
     with open("dataset_annotations.txt", 'r') as f:
         for idx, text in enumerate(f.readlines()):
             data_label = text.split(',')[8]  # ex) 'left_turn', '40', ...
+            file_name = "RoadMarkingDataset2/{}".format(text.split(',')[9]).replace('.png', '.jpg').rstrip()
+            
+            if imgIdx >= len(images):
+                break
+
+            if file_name != images[imgIdx]:
+                continue
+
             value_exists = False
             for k, v in label_dict.items():
                 if v == data_label:
-                    labels[idx] = k
+                    labels[imgIdx] = k
                     value_exists = True
             if not value_exists:
                 key = len(label_dict)
                 label_dict[key] = data_label
-                labels[idx] = key
+                labels[imgIdx] = key
+
+            imgIdx += 1
 
     # Split data into train and test data (95, 5)
     train_img, test_img, train_labels, test_labels = train_test_split(images, labels)
