@@ -2,28 +2,6 @@ import cv2
 import numpy as np
 
 
-def is_vertically_aligned(b1, b2):
-    max_delta = 40.0
-    (x1, y1, w1, h1) = b1
-    (x2, y2, w2, h2) = b2
-
-    if abs(y2 - y1) <= max_delta and abs(h2 - h1) <= max_delta:
-        return True
-
-    return False
-
-
-def is_horizontally_close(b1, b2):
-    max_delta = 100.0
-    (x1, y1, w1, h1) = b1
-    (x2, y2, w2, h2) = b2
-
-    if abs(x1 - x2) <= max_delta:
-        return True
-
-    return False
-
-
 def merge_box(boxes):
     X = []
     Y = []
@@ -68,31 +46,9 @@ def is_close(b1, b2):
     return distance < 30
 
 
+# Combine boxes that are similar
 def merge_similar_box(boxes):
-    # Combine boxes that are similar
     _boxes = set()
-    merged = False
-
-    # for b1 in boxes:
-    #     similar_boxes = []
-    #     for b2 in boxes:
-    #         if is_vertically_aligned(b1, b2) and is_horizontally_close(b1, b2):
-    #             similar_boxes.append(b2)
-    #
-    #     # Combine boxes
-    #     if len(similar_boxes) > 1:
-    #         merged = True
-    #         combined_box = merge_box(similar_boxes)
-    #         _boxes.add(combined_box)
-    #         # Remove merged boxes
-    #         for box in similar_boxes:
-    #             boxes.remove(box)
-    #
-    # if merged:
-    #     boxes = boxes + merge_similar_box(list(_boxes))
-    # else:
-    #     boxes = boxes
-
 
     index = 0
     while index < len(boxes):
@@ -124,10 +80,10 @@ def merge_similar_box(boxes):
     for box in boxes:
         (x, y, w, h) = box
 
-        if (w*h) > 50000:
+        if (w*h) > 50000: # Remove big box
             continue
 
-        if x < 200 or x+w > 600:
+        if x < 200 or x+w > 600: # Remove box on left and right side
             continue
 
         if h/w > 2:
@@ -137,7 +93,7 @@ def merge_similar_box(boxes):
             continue
         _boxes.append(box)
 
-    sorted(_boxes, key = lambda x: x[1] + x[3])
+    sorted(_boxes, key=lambda x: x[1] + x[3])
 
     return _boxes
 

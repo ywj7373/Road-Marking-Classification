@@ -12,7 +12,7 @@ label_dict = {}
 
 
 # Need to split train and test data for each class
-def train_test_split(images, labels, test_size=0.05, shuffle=True, random_state=42):
+def train_test_split(images, labels, test_size=0.1):
     # Group by class
     imap = {}
     for idx, label in enumerate(labels):
@@ -61,14 +61,12 @@ def train_images(labels, images, classifier):
         img = cv2.imread(image, 3)
         rectified_img, boxes = get_candidates(img)
 
-        for box in boxes:
-            (x, y, w, h) = box
-
         if len(boxes) <= 0:
             skipped.append(idx)
             continue
 
         best_box = boxes[-1]
+        (x, y, w, h) = best_box
         cv2.rectangle(rectified_img, (x, y), (x + w, y + h), (0, 255, 0), 1)
         # Image.fromarray(rectified_img).show()
         # print(rectified_img.shape)
@@ -79,7 +77,7 @@ def train_images(labels, images, classifier):
             h = hog(rectified_img, best_box)
             H[idx] = np.array(h).flatten()
 
-    # Train SVM
+    # Skip data with no candidates
     _labels = []
     _H = []
     for idx, (label, h_element) in enumerate(zip(labels, H)):
@@ -88,6 +86,7 @@ def train_images(labels, images, classifier):
         _labels.append(label)
         _H.append(h_element)
 
+    # Train SVM
     if classifier == "svm-linear":
         print("Training SVM linear")
         train_svm(_labels, _H, "linear")
@@ -99,7 +98,7 @@ def train_images(labels, images, classifier):
         train_rf(_labels, _H)
     elif classifier == "mlp":
         print("Training MLP")
-        train_mlp(_labels, _H)
+        train_mlp(_labels, _H, len(label_dict))
     else:
         ValueError("Wrong classifier")
         exit(1)
@@ -129,7 +128,7 @@ def test_images(labels, images, classifier):
             elif classifier == "rf":
                 output = int(run_rf(h)[1][0][0])
             elif classifier == "mlp":
-                output = int(run_mlp(h)[1][0][0])
+                output = int(run_mlp(h))
             else:
                 ValueError("Wrong classifier")
                 exit(1)
@@ -138,10 +137,8 @@ def test_images(labels, images, classifier):
             cv2.putText(img_clone, output_str, (x, y - 3), 3, 1, (0, 255, 0), 2, cv2.LINE_AA)
 
         Image.fromarray(img_clone).show()
-        # print(answers)
-        # print(labels[idx])
 
-        if labels[idx] in answers:
+        if correct_label in answers:
             sum += 1
 
         # Reverse Rectification with labels
@@ -156,14 +153,13 @@ def main(args):
     # Load multiple images
     image_path = "RoadMarkingDataset2/*.jpg"
     images = sorted(glob.glob(image_path))
-    # Load labels (shape = (1443, 1))
+
+    # Load labels
     labels = np.zeros((len(images), 1)).astype(np.int32)
     global label_dict
-    imgIdx = 0
-
-    # return
     with open("dataset_annotations.txt", 'r') as f:
-        for idx, text in enumerate(f.readlines()):
+        imgIdx = 0
+        for text in f.readlines():
             data_label = text.split(',')[8]  # ex) 'left_turn', '40', ...
             file_name = "RoadMarkingDataset2/{}".format(text.split(',')[9]).replace('.png', '.jpg').rstrip()
 
@@ -185,7 +181,7 @@ def main(args):
 
             imgIdx += 1
 
-    # Split data into train and test data (95, 5)
+    # Split data into train and test data (90, 10)
     train_img, test_img, train_labels, test_labels = train_test_split(images, labels)
 
     # Start training or testing images

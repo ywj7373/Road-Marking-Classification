@@ -17,15 +17,13 @@ def train_svm(labels, train_hog, kernel):
     svm = cv2.ml.SVM_create()
     svm.setType(cv2.ml.SVM_C_SVC)
 
-    if kernel == "linear":
-        svm.setKernel(cv2.ml.SVM_LINEAR)
-    elif kernel == "rbf":
+    if kernel == "rbf":
         svm.setKernel(cv2.ml.SVM_RBF)
     else:
         svm.setKernel(cv2.ml.SVM_LINEAR)
 
     svm.setC(0.01)
-    svm.setTermCriteria((cv2.TERM_CRITERIA_COUNT, 10, 1.0))
+    svm.setTermCriteria((cv2.TERM_CRITERIA_COUNT, 100, 1.0))
 
     train_hog = np.array(train_hog).astype(np.float32)
     labels = np.array(labels).reshape((-1, 1))
@@ -79,10 +77,10 @@ def run_rf(h):
     return rf.predict(h)
 
 
-def train_mlp(labels, train_hog):
+def train_mlp(labels, train_hog, num_class):
     _, n = np.array(train_hog).shape
     mlp = cv2.ml.ANN_MLP_create()
-    layer_sizes = np.int32([n, 100, 100, 13])
+    layer_sizes = np.int32([n, 100, 100, num_class])
 
     mlp.setLayerSizes(layer_sizes)
     mlp.setTrainMethod(cv2.ml.ANN_MLP_BACKPROP)
@@ -91,12 +89,18 @@ def train_mlp(labels, train_hog):
     mlp.setTermCriteria((cv2.TERM_CRITERIA_COUNT, 20, 0.01))
     mlp.setActivationFunction(cv2.ml.ANN_MLP_SIGMOID_SYM, 2, 1)
 
+    labels_n = len(labels)
+    new_labels = np.zeros(labels_n * num_class, np.int32)
+    idx = np.int32(labels + np.arange(labels_n) * num_class)
+    new_labels[idx] = 1
+    new_labels = new_labels.reshape(-1, num_class).astype(np.float32)
+
     train_hog = np.array(train_hog).astype(np.float32)
-    labels = np.array(labels).reshape((-1, 1)).astype(np.float32)
-    print(train_hog.shape)
+
     start_time = time.time()
-    if mlp.train(train_hog, cv2.ml.ROW_SAMPLE, labels):
-        train_preds = mlp.predict(train_hog)[1]
+    if mlp.train(train_hog, cv2.ml.ROW_SAMPLE, new_labels):
+        _, out = mlp.predict(train_hog)
+        train_preds = out.argmax(-1)
         print("Elasped time: {:6}s".format(time.time() - start_time))
         print('Training Accuracy: %.6f' % np.average(train_preds == labels))
         mlp.save('mlp.xml')
@@ -111,4 +115,6 @@ def run_mlp(h):
     mlp = cv2.ml.ANN_MLP_load('mlp.xml')
     h = np.array(h).reshape(1, h.shape[0]).astype(np.float32)
 
-    return mlp.predict(h)
+    _, out = mlp.predict(h)
+
+    return out.argmax(-1)
